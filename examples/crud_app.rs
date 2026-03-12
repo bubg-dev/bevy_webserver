@@ -1,6 +1,5 @@
 use bevy::prelude::*;
-use bevy_defer::{AsyncAccess, AsyncWorld};
-use bevy_easy_database::*;
+use bevy_defer::{ AsyncWorld};
 use bevy_webserver::RouterAppExt;
 use maud::{html, Markup, DOCTYPE};
 use serde::{Deserialize, Serialize};
@@ -17,10 +16,7 @@ fn main() {
         .add_plugins((
             MinimalPlugins,
             bevy_webserver::BevyWebServerPlugin,
-            DatabasePlugin,
         ))
-        .add_database_mapping::<Player>()
-        .add_database_mapping::<Score>()
         // Routes
         .route("/", axum::routing::get(index))
         .route("/players", axum::routing::get(list_players))
