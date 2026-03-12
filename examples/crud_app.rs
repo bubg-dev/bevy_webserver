@@ -1,10 +1,17 @@
-use bevy::prelude::*;
-use bevy_defer::{AsyncAccess, AsyncWorld};
-use bevy_easy_database::*;
-use bevy_webserver::RouterAppExt;
-use maud::{html, Markup, DOCTYPE};
-use serde::{Deserialize, Serialize};
 use std::str::FromStr;
+
+use bevy::prelude::*;
+use bevy_defer::AsyncWorld;
+use bevy_webserver::RouterAppExt;
+use maud::{
+  html,
+  Markup,
+  DOCTYPE,
+};
+use serde::{
+  Deserialize,
+  Serialize,
+};
 
 #[derive(Component, Clone, Serialize, Deserialize)]
 pub struct Player(pub String);
@@ -13,157 +20,151 @@ pub struct Player(pub String);
 pub struct Score(pub u32);
 
 fn main() {
-    App::new()
-        .add_plugins((
-            MinimalPlugins,
-            bevy_webserver::BevyWebServerPlugin,
-            DatabasePlugin,
-        ))
-        .add_database_mapping::<Player>()
-        .add_database_mapping::<Score>()
-        // Routes
-        .route("/", axum::routing::get(index))
-        .route("/players", axum::routing::get(list_players))
-        .route("/players/new", axum::routing::post(create_player))
-        .route("/players/{id}/update", axum::routing::post(update_score))
-        .route("/players/{id}/delete", axum::routing::delete(delete_player))
-        .run();
+  App::new()
+    .add_plugins((MinimalPlugins, bevy_webserver::BevyWebServerPlugin))
+    // Routes
+    .route("/", axum::routing::get(index))
+    .route("/players", axum::routing::get(list_players))
+    .route("/players/new", axum::routing::post(create_player))
+    .route("/players/{id}/update", axum::routing::post(update_score))
+    .route("/players/{id}/delete", axum::routing::delete(delete_player))
+    .run();
 }
 
 // Template for the base layout
 fn base_template(content: Markup) -> Markup {
-    html! {
-        (DOCTYPE)
-        html {
-            head {
-                title { "Game Score Tracker" }
-                script src="https://unpkg.com/htmx.org@1.9.10" {}
-                link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" {}
-                style {
-                    (CSS)
-                }
-            }
-            body {
-                h1 { "Game Score Tracker" }
-                (content)
-            }
-        }
-    }
+  html! {
+      (DOCTYPE)
+      html {
+          head {
+              title { "Game Score Tracker" }
+              script src="https://unpkg.com/htmx.org@1.9.10" {}
+              link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" {}
+              style {
+                  (CSS)
+              }
+          }
+          body {
+              h1 { "Game Score Tracker" }
+              (content)
+          }
+      }
+  }
 }
 
 // Index page with form to add new players
 async fn index() -> axum::response::Html<String> {
-    let markup = base_template(html! {
-        div {
-            form hx-post="/players/new" hx-target="#player-list" hx-swap="outerHtml" {
-                label for="name" { "Player Name: " }
-                input type="text" name="name" required;
-                button type="submit" { "Add Player" }
-            }
+  let markup = base_template(html! {
+      div {
+          form hx-post="/players/new" hx-target="#player-list" hx-swap="outerHtml" {
+              label for="name" { "Player Name: " }
+              input type="text" name="name" required;
+              button type="submit" { "Add Player" }
+          }
 
-            div id="player-list" hx-get="/players" hx-trigger="load" {}
-        }
-    });
+          div id="player-list" hx-get="/players" hx-trigger="load" {}
+      }
+  });
 
-    axum::response::Html(markup.into_string())
+  axum::response::Html(markup.into_string())
 }
 
 // List all players
 async fn list_players() -> axum::response::Html<String> {
-    let mut query = AsyncWorld.query::<(&Player, &Score)>();
-    let players = query
-        .get_mut(|mut query| -> Vec<(Player, Score)> {
-            let mut players = vec![];
-            for (player, score) in query.iter() {
-                players.push((player.clone(), score.clone()));
-            }
-            players
-        })
-        .unwrap();
+  let mut query = AsyncWorld.query::<(&Player, &Score)>();
+  let players = query
+    .get_mut(|mut query| -> Vec<(Player, Score)> {
+      let mut players = vec![];
+      for (player, score) in query.iter() {
+        players.push((player.clone(), score.clone()));
+      }
+      players
+    })
+    .unwrap();
 
-    let markup = html! {
-        div class="player-list" {
-            @for (player, score) in players {
-                (update_from_player(&player, &score))
-            }
-        }
-    };
+  let markup = html! {
+      div class="player-list" {
+          @for (player, score) in players {
+              (update_from_player(&player, &score))
+          }
+      }
+  };
 
-    axum::response::Html(markup.into_string())
+  axum::response::Html(markup.into_string())
 }
 
 // Create a new player
 async fn create_player(form: axum::Form<PlayerForm>) -> axum::response::Html<String> {
-    AsyncWorld.spawn_bundle((Player(form.name.clone()), Score(0)));
-    // yielding so the time we come back we'll have the player spawned in
-    AsyncWorld.yield_now().await;
-    list_players().await
-    // Return updated player list
+  AsyncWorld.spawn_bundle((Player(form.name.clone()), Score(0)));
+  // yielding so the time we come back we'll have the player spawned in
+  AsyncWorld.yield_now().await;
+  list_players().await
+  // Return updated player list
 }
 
 fn update_from_player(player: &Player, score: &Score) -> Markup {
-    html! {
-        div class="player-item" {
-        span { (player.0) " - Score: " (score.0) }
+  html! {
+      div class="player-item" {
+      span { (player.0) " - Score: " (score.0) }
 
-        form hx-swap="outerHTML" hx-target="closest .player-item" hx-post={"/players/" (player.0) "/update"} hx-trigger="change" style="display: inline;" {
-            input type="number" name="score" value=(score.0);
-        }
+      form hx-swap="outerHTML" hx-target="closest .player-item" hx-post={"/players/" (player.0) "/update"} hx-trigger="change" style="display: inline;" {
+          input type="number" name="score" value=(score.0);
+      }
 
-        button
-            hx-delete={"/players/" (player.0) "/delete"}
-            hx-target="closest .player-item"
-            hx-swap="outerHTML"
-            { "Delete" }
-        }
-    }
+      button
+          hx-delete={"/players/" (player.0) "/delete"}
+          hx-target="closest .player-item"
+          hx-swap="outerHTML"
+          { "Delete" }
+      }
+  }
 }
 
 // Update player's score
 async fn update_score(
-    path: axum::extract::Path<String>,
-    form: axum::Form<ScoreForm>,
+  path: axum::extract::Path<String>,
+  form: axum::Form<ScoreForm>,
 ) -> axum::response::Html<String> {
-    AsyncWorld.run(|world| -> axum::response::Html<String> {
-        let player_name = path.0;
+  AsyncWorld.run(|world| -> axum::response::Html<String> {
+    let player_name = path.0;
 
-        let mut query = world.query::<(&Player, &mut Score)>();
-        for (player, mut score) in query.iter_mut(world) {
-            if player.0 == player_name {
-                if let Ok(form_score) = u32::from_str(&form.score) {
-                    score.0 = form_score;
-                }
-                return axum::response::Html(update_from_player(player, &score).into_string());
-            }
+    let mut query = world.query::<(&Player, &mut Score)>();
+    for (player, mut score) in query.iter_mut(world) {
+      if player.0 == player_name {
+        if let Ok(form_score) = u32::from_str(&form.score) {
+          score.0 = form_score;
         }
-        return axum::response::Html("".to_string());
-    })
+        return axum::response::Html(update_from_player(player, &score).into_string());
+      }
+    }
+    return axum::response::Html("".to_string());
+  })
 }
 
 // Delete a player
 async fn delete_player(path: axum::extract::Path<String>) -> axum::response::Html<String> {
-    AsyncWorld.apply_command(|world: &mut World| {
-        let player_name = path.0;
+  AsyncWorld.apply_command(|world: &mut World| {
+    let player_name = path.0;
 
-        let mut query = world.query::<(Entity, &Player)>();
-        for (entity, player) in query.iter(&world) {
-            if player.0 == player_name {
-                world.despawn(entity);
-                break;
-            }
-        }
-    });
-    axum::response::Html("".to_string())
+    let mut query = world.query::<(Entity, &Player)>();
+    for (entity, player) in query.iter(&world) {
+      if player.0 == player_name {
+        world.despawn(entity);
+        break;
+      }
+    }
+  });
+  axum::response::Html("".to_string())
 }
 
 #[derive(Deserialize)]
 struct PlayerForm {
-    name: String,
+  name: String,
 }
 
 #[derive(Deserialize)]
 struct ScoreForm {
-    score: String,
+  score: String,
 }
 
 const CSS: &'static str = r#"
