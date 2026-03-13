@@ -1,6 +1,6 @@
 [package]
 name = "bevy_webserver"
-version = "0.3.0"
+version = "0.3.1"
 edition = "2021"
 license = "MIT OR Apache-2.0"
 authors = ["Malek <pocmalek@gmail.com>"]
@@ -28,8 +28,10 @@ version = "0.18.1"
 default-features = false
 
 [dependencies.bevy_defer]
-version = "0.17.0"
-default-versions = false
+git = "https://github.com/bubg-dev/bevy_defer.git"
+tag = "v0.16.0"
+default-features = false
+features = ["derive", "spawn_macro"]
 
 [dev-dependencies]
 maud = "0.27.0"
